@@ -1,0 +1,44 @@
+/- Test callisto file.
+-/
+
+def a int: 0
+def b array(int): {0 1 2 3 4 5 6 7 8 9}
+def c char: 'c'
+def d string: "Something"
+
+type type1: int
+enum type2:
+   Foo
+   Bar
+   Bop
+end
+
+; AKA a linked list
+struct type3(%a):
+   head %a
+   tail type3
+end
+
+union type4(%sometype):
+   U1(int)
+   U2(float)
+   U3(%sometype)
+end
+
+defun fact x int {int}
+   if (< x 2) then
+      return x
+   else
+      return (* x (fact (- x 1)))
+   end
+end
+
+defun wiggyTestFunction {}
+   var x int: 0
+   while (< x 10) do
+      (printint x)
+      ; Oops, we have no assignment operator!
+   end
+   var f fun(int)(int): fact
+   (printint (fact 5))
+end

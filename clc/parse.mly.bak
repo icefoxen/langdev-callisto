@@ -1,0 +1,252 @@
+%{
+
+open ErrorReport
+open Syntree
+
+(* I use this for testing sometimes.  Seriously! *)
+let print_bop () = print_endline "BOP!";;
+
+%}
+
+%token LPAREN RPAREN LBRACE RBRACE COMMA COLON ASSIGN
+%token IF THEN ELIF ELSE END TYPE TYPECASE STRUCT UNION ENUM
+%token WHILE DO DEF DEFUN FUN LET RETURN CASE
+%token EOF
+%token <int> INT
+%token <float> FLOAT
+%token <string> ID
+%token <char> CHAR
+%token <string> STRING
+
+%type <Syntree.expr list> main
+%start main
+
+%%
+
+main: 
+   /* empty */ 
+   { [Var( 0, "TEST1" )] }
+ | stmlist
+   { [Var( 1, "TEST2" )] }
+;
+
+
+stmlist:
+   stm
+      {[$1]}
+ | stm stmlist
+      {$1 :: $2}
+;
+
+stm:
+   vardecl
+   {}
+ | typedecl
+   {}
+;
+
+vardecl:
+   DEF ID typedef COLON expr
+   {}
+ | DEFUN ID funarglist LPAREN rettypelist RPAREN exprlist END
+   {}
+
+;
+
+typedecl:
+   TYPE typedef COLON typedef
+   {}
+ | STRUCT typedef COLON structmemberlist END
+   {}
+ | UNION typedef COLON unionmemberlist END
+   {}
+ | ENUM ID COLON enummemberlist END
+   {}
+;
+
+enummemberlist:
+   enummember
+   {}
+ | enummember enummemberlist
+   {}
+;
+
+enummember:
+   ID
+   {}
+;
+
+structmemberlist:
+   structmember
+   {}
+ | structmember structmemberlist
+   {}
+;
+
+structmember:
+   ID typedef
+   {}
+;
+
+unionmemberlist:
+   unionmember
+   {}
+ | unionmember unionmemberlist
+   {}
+;
+
+unionmember:
+   ID LPAREN typedeflist RPAREN
+   {}
+;
+
+
+typedef:
+   ID
+   {}
+ | ID LPAREN typedeflist RPAREN
+  {}
+;
+
+typedeflist:
+   typedef
+   {}
+ | typedef typedeflist
+   {}
+;
+
+
+exprlist:
+   expr
+     { [$1] }
+ | expr exprlist
+     { $1 :: $2 }
+;
+
+expr:
+   litexpr
+      { Literal( !lineNum, $1 ) }
+ | funcallexpr
+      { Literal( !lineNum, IntLit( 1 ) ) }
+ | ifexpr
+      { Literal( !lineNum, IntLit( 1 ) ) }
+ | whileexpr
+      { Literal( !lineNum, IntLit( 1 ) ) }
+ | varexpr
+      { Literal( !lineNum, IntLit( 1 ) ) }
+ | typecaseexpr
+      { Literal( !lineNum, IntLit( 1 ) ) }
+ | funexpr
+      { Literal( !lineNum, IntLit( 1 ) ) }
+ | retexpr
+      { Literal( !lineNum, IntLit( 1 ) ) }
+ | ID
+      { Literal( !lineNum, IntLit( 1 ) ) }
+;
+
+litexpr:
+   INT
+   { IntLit( $1 ) }
+ | FLOAT
+   { IntLit( 1 ) }
+ | CHAR
+   { IntLit( 1 ) }
+ | STRING
+   { IntLit( 1 ) }
+ | arraylit
+   { IntLit( 1 ) }
+; 
+
+arraylit:
+   LBRACE exprlist RBRACE
+   {}
+;
+
+funcallexpr:
+   LPAREN exprlist RPAREN
+   {}
+;
+
+ifexpr:
+   IF expr THEN exprlist END
+   {}
+ | IF expr THEN exprlist ELSE exprlist END
+   {}
+ | IF expr THEN exprlist eliflist END
+   {}
+ | IF expr THEN exprlist eliflist ELSE exprlist END
+   {}
+;
+
+eliflist:
+   elif
+   {}
+ | elif eliflist
+   {}
+;
+
+elif:
+   ELIF expr THEN exprlist
+   {}
+;
+
+whileexpr:
+   WHILE expr THEN exprlist END
+   {}
+;
+
+varexpr:
+   LET ID typedef COLON expr
+   {}
+;
+
+typecaseexpr:
+   TYPECASE expr COLON typecasememberlist END
+   {}
+;
+
+typecasememberlist:
+   typecasemember
+   {}
+ | typecasemember typecasememberlist
+   {}
+;
+
+typecasemember:
+   CASE ID COLON exprlist
+   {}
+;
+
+funarglist:
+   funarg
+   {}
+ | funarg COMMA funarglist
+   {}
+;
+
+funarg:
+   ID typedef
+   {}
+;
+
+rettypelist:
+   typedef
+   {}
+ | typedef COMMA typedeflist
+   {}
+;
+
+funexpr:
+   FUN funarglist LPAREN rettypelist RPAREN exprlist END
+   {}
+;
+
+retexpr:
+   RETURN expr
+   {}
+;
+
+      
+
+%%
+

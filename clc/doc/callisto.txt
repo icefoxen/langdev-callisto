@@ -1,0 +1,389 @@
+*Introduction 
+Callisto is a programming language designed for low-level processing and
+system programming. It is essentially designed to replace C and be simpler
+than baroque alternatives like C++ and D.
+It has utterly no redeeming features from a language research standpoint,
+I'm sure.  But for fuck's sake, C and its derivatives have to die, and I don't
+yet believe that more advanced languages like C# and OCaml and junk can
+fully replace it.  How many of these languages use runtimes written in C or
+C++?
+(Suitably parenthesized... Lisp guys, I know Lisp can be used to write its
+own runtime with a bit of bootstrapping, but face it...  Lisp is terrible at
+working with current computer systems, and if anybody had the balls to
+write a modern system where Lisp didn't completely clash with everything,
+they would have done it already.  Besides, Common Lisp is a huge ball of
+committee-mud that's half-stuck in the 70's.  So.  Yeah.)
+
+Screw simplicity, let's go for broke and make a complete spec.
+
+Notable features:
+Strong static typing
+Parametric polymorphism
+Well-defined modules
+Tagged unions
+First-class functions
+Enumerations
+Bounds-checked arrays
+Pointers creating access to low-level implementation stuff
+Exceptions
+
+
+Iffy things we probably want to include later:
+Functions taking multiple arguments
+Default arguments and such.
+Functions returning multiple values
+Arbitrary-base integer literals
+Expressions in array literals?
+Different size integers.
+Unicode
+More reflection, dynamic compilation etc
+Array slicing
+Iterators, etc
+Default values and initialization syntax for structures
+
+
+Iffy things we probably don't want to include later:
+Type classes
+Type inference
+Type conversions
+Storage analysis
+Immutable variables
+
+
+
+We leave out for now:
+Objects.  We can write Obj-C-like object systems in this language pretty easily.
+GC and such.  Too much infrastructure.
+Multiprocessing.  Also too much infrastructure, and no clear right way to do it.
+Symbols.   Sorry, use enums.
+
+
+*Lexical Elements 
+**Identifiers 
+Identifiers are case-sensitive. They may not start with numbers, but may
+include the characters a-z, A-Z, and 0-9, as well as +, -, *, /, !, >, <,
+_, =, and probably a few other things.
+
+**Comments 
+Line comments start with a semicolon (;). Block comments start with /- and end with -/. Block comments may be nested.
+
+**Literals 
+Integer literals are strings of numbers 0-9. "0x" followed by a string of
+0-9 and a-f or A-F (case insensitive) are hexadecimal integers. "0b"
+followed by a string of 0-1 are binary integers. "0o" followed by a string
+of 0-7 are octal numbers.
+
+Floating point literals are just numbers 0-9, a decimal point, and some more
+numbers 0-9. You can also put an exponential term at the end, such as 3.5e3,
+or 94.364E-4. Case on the "e" doesn't matter.
+
+Array literals are a list of literals surrounded by {curly brackets}.
+All elements in an array literal must have the same type.  You cannot
+put expressions in array literals at this point.
+
+A single character enclosed in single quotes (') is a character literal. There
+are also several escape sequences for non-printable characters: '\t' is a tab,
+'\n' is a newline, '\r' is a carriage return, and '\b' is a backspace. '\X'
+where X is any integer literal (as above) specifies a character literal with
+that ASCII value. You know the drill.
+
+For now, characters are just 7-bit ASCII.  Unicode will come later.
+Note that characters are CHARACTERS, not numbers.  Their size is not
+guarenteed to be a byte, or anything else.
+
+Strings are delimited by double quotes ("). A string is just an array of
+characters. Character literals can be embedded in strings, just do the
+backslash escape sequence.
+
+
+**Reserved symbols
+
+Reserved names and symbols are: 
+if then elif else while do end fun in : , ( ) [ ] { } def defun " ' typecase
+struct type enum union <-
+
+*Types and Type System
+KISS.  Basic atomic types: integers, floats, characters.  Pointers and enums
+and functions as well.
+Then we have compound types: functions, tagged unions, arrays and structs
+
+We do the Java-ish value vs. reference type.  Strings, structures, tagged unions
+and arrays are all reference types.
+XXX: Actually, should tagged unions be reference types?  They could be references
+themselves...  Hm.
+
+We also want parametric polymorphism.  Polymorphic types are just given by a
+name prefixed with a %.  You can do nothing with a polymorphic type except
+assign it, return it, or call another polymorphic function on it.  For
+instance:
+
+defun foo v1 %t, v2 %t {bool}
+   return (= v1 v2)
+end
+
+
+Types can contain other types...  arrays are the most obvious example, for instance
+"array(int)" or even "array(%t)".
+
+Right now, for the sake of oh-gods simplicity...
+1) There is no way to convert types into each other, and
+2) Integers and floats are seperate types entirely.  + is not the same 
+function as +.
+Gods help me.
+
+
+**Type definitions
+New types can be defined with the syntax:
+type x: y
+which creates a new type "x" which is eqivilant to type "y".
+Polymorphism and such can be applied here.  So you can write
+type intArray: array(int)
+to create a version of the array type that only accepts integer values.
+If you wanted to create a new type of array that could accept either
+integer or float values, you'd have to use a tagged union.
+
+
+**Numbers 
+We've covered this pretty well.  Integers and floats.  Integers are at the moment
+whatever size machine word is handy.  Floating points are IEEE.754 or whatever it
+is.
+
+**Arrays
+Arrays are a contiguous whack of memory.  They have a fixed length, they know
+their length, and do automatic bounds-checking unless you tell them not to.
+They do parametric polymorphism too, as demonstrated above.
+
+Arrays elements are indexed by the syntax
+arr[i]
+and are assigned to by the syntax
+arr[i] <- val
+where both arr and i can be expressions.
+
+**Characters
+Characters, we've gone over.
+
+**Strings
+Strings are arrays of characters.  Nothing special apart from syntax.
+Strings can be referenced and assigned just like arrays can.
+
+**Structures
+Structures are a bunch of different types mooshed together.
+This declares a new structure of type "foo" with three members: an integer x, a
+float y, and a reference to another foo structure "z".
+struct foo:
+   x int
+   y float
+   z foo
+end
+
+Structures can be polymorphic:
+
+struct list(%t):
+   item %t
+   next list(%t)
+end
+
+**Pointers
+Pointers are for low-level programming.  You can point them at arbitrary
+addresses.  You can do arithmatic and let them dangle and overrun arrays and
+fandango on core and all sorts of things.  Try to never use them.
+
+type foo_p: pointer(foo)
+
+var someFoo foo: ...
+var p1 foo_p: (ref someFoo)
+var foo2 foo: (deref p1)
+p1 <- (+ p1 -79)
+foo2 <- (deref p1)  ; Kaboom!  You'd better pray this segfaults.
+
+
+**Tagged Unions
+Tagged unions consist of an integer and a reference smooshed against each other.
+Yeah, I dunno how to explain these right now.
+
+union foo:
+   Foo( int )
+   Bar( somestruct )
+   Bop( float )
+end
+
+var x foo: :Foo( 10 )
+typecase x:
+   case Foo: (doSomethingWithInt x)
+   case Bar: (doSomethingWithSomeStruct x)
+   case Bop: (doSomethingWithFloat x)
+end
+   
+
+**Enumerations
+Enumerations are basically named numbers.  However, unlike C, they're actually
+type-checked.
+
+enum foo:
+   Foo  ; = 0
+   Bar <- 30  ; = 30
+   Bop  ; = 31
+   Baz <- -3  ; = -3
+   Quux <- 30  ; Compilation error; duplicates are invalid.
+end
+
+We may automagically get a couple functions now...  foo2int and int2foo.
+This lets enumerations have meaningful numerical values, like months and
+stuff.  For int2foo, they'll naturally check that the integer is actually in a valid
+range.
+
+
+
+*Program Structure
+
+Everything is evaluated from left to right. All expressions are evaluated in
+the order they are written. Program execution probably starts at the function
+called "main" which recieves as its argument an array of strings as its argument, 
+and returns an integer as the program's return value, yadda yadda.
+
+A program is a bunch of statements, for now. We may add more declerations like namespaces and such soon.
+
+*Statements
+
+There are only a few kinds of statements, all of which happen outside of
+functions: global variable defintions (for globals, constants, functions,
+etc), and type definitions (structures, etc).
+We will add module definitions somewhere.
+
+The most basic thing is global variable definitions, which are also used for function definitions with a bit of syntactic sugar
+
+def somename type: someexpression
+
+def somefunc function-of-whatever-type-signature: fun args {rettype} ... end
+
+defun funcname args {rettype} end
+
+**Type Definition
+type foo: bar
+struct foo: ... end
+union foo: ... end
+enum foo: ... end
+
+
+**Builtin types:
+int
+float
+char
+string
+array(%a)
+pointer(%a)
+fun(argtype, argtype, ...)(rettype, rettype, ...)
+
+There will (someday) be more builtin types of various sizes; long, double, byte, word,
+possibly a few more.  There will be types that explicitly state their size and
+signedness, such as 'int8', 'uint8', 'int16', 'uint16', etc.  There will also
+be constants that tell you just how big 'int', 'float' and so on are on the
+given platform.
+
+We'll have basically the entire Scheme numerical tower, it'll just be a
+library.
+
+
+*Expressions
+
+We start with only a few types of expressions apart from literals and
+variables: function definitions, if statements, while statements, function
+calls, and variable bindings, and typecases.
+
+XXX: To do: Assignment!  Doh.
+XXX: Hmm.  Array references CAN be functions, but that's sorta nasty.
+Structure references are even worse.
+XXX: Explicit scope blocks?
+
+
+**Function Definitions
+
+Functions can return multiple values, and have to have the potential to take arbitrary numbers of arguments.
+Right now, these are anonymous functions.  Non-anonymous functions are
+basically just global variables.
+
+XXX: To do: make better syntax (the {} for return types, especially... maybe
+||?)
+XXX: So far, functions must ALWAYS return at least one value.  This may end up
+changing.  Zero is just another possible number of return values, yes?
+
+fun x int, y float, z somethingelse {returntype} ... end
+
+Optional arguments would be very nice, and keywords MIGHT be a good idea as well. Maybe optional arguments and keywords go together...
+
+**Function Calls
+
+(f x1 x2 ...)
+
+All math and logic and such is function calls for now.
+It'd be nice to inline them someday.
+
+**If and While
+
+if a then b (elif c)* (else z) end
+
+while a do b end
+
+**Variable Binding
+
+var x int: a
+var y float: b
+var z somethingelse: c
+var a int, b float, c string: (someComplicatedFunction)
+
+XXX: Explicit scope a la Lisp is cool!
+Possibly not what we want to do in the end, but cool nonetheless.
+
+**Typecase
+typecase x:
+   case Foo: (doSomethingWithInt x)
+   case Bar: (doSomethingWithSomeStruct x)
+   case Bop: (doSomethingWithFloat x)
+end
+
+**Return
+return <expr>
+return <expr> <expr> <expr>
+
+**Assignment
+a <- b
+a b c <- d e f
+
+*Modules
+
+Right now, we have no module system.
+
+The choices here abound.  Modules can be flat or heirarchical, covert or overt (hides or exposes things by default), simple or complex...
+
+I somewhat like the C# system of namespaces, actually.  Heirarchical namespaces that are not explicitly connected to any single file or such, but magically mesh together during loading.
+
+
+*Exceptions
+Oy.
+
+
+*Library
+We need ratios and bignums.  Basically, the whole Scheme numerical tower.
+Check out Cocoa.
+
+
+*Low Level Junk
+
+**Function Call Stuff 
+The function caller pushes stuff on the stack, and is responsible for popping
+it afterwards. The function called leaves the results on top of the stack
+though, so the caller should probably move them somewhere safe before popping
+everything.
+
+**Name Mangling
+
+*Notes
+Unicode?
+XXX: Look for papers on function overloading, aka ad-hoc polymorphism.  I seem
+to recall one called "making ad-hoc polymorphism less ad-hoc".  Aha, yes, it
+basically talks about Haskell typeclasses.
+XXX: Object system!  Look at Objective C.  
+XXX: Variable-length arguments for functions!  Eep!
+XXX: Exceptions!
+XXX: Separate methods from namespaces.
+XXX: 

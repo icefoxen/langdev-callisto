@@ -1,0 +1,450 @@
+*Introduction 
+Callisto is a programming language designed for low-level processing and
+system programming. It is essentially designed to replace C and be simpler
+than baroque alternatives like C++ and D.
+It has utterly no redeeming features from a language research standpoint,
+I'm sure.  But for fuck's sake, C and its derivatives have to die, and I don't
+yet believe that more advanced languages like C# and OCaml and junk can
+fully replace it.  How many of these languages use runtimes written in C or
+C++?
+
+
+Notable features:
+Strong static typing
+Parametric polymorphism
+Well-defined modules
+Tagged unions
+First-class functions
+Enumerations
+Bounds-checked arrays
+Pointers allowing access to raw memory and such low-level stuff
+Exceptions
+Arbitrary-base integer literals
+Functions returning multiple values
+Functions taking variable number of arguments
+Default values and initialization syntax for structures
+Default way to tell whether to pack or pad structures
+Default argument values, optional args, and such.
+
+What we are adding in this version (not specified yet):
+Expressions in structure and array literals
+Different size integers.
+Unicode
+Module system
+Array slicing
+Inline assembler
+Tail call optimization
+Data barriers (multithreading, preventing reordering of instructions)
+
+More complex things we probably want to include later:
+More reflection, dynamic compilation etc
+Iterators, etc
+SOME kind of more flexible type extension method...  objects or something.
+
+
+Iffy things we probably don't want to include later but are worth thinking 
+about:
+Type classes
+Type inference
+Type conversions
+Storage analysis
+Immutable variables
+
+
+
+We leave out for now:
+Objects.  We can write Obj-C-like object systems in this language pretty easily.
+GC and such.  Too much infrastructure.
+Multiprocessing.  Also too much infrastructure, and no clear right way to do it.
+Symbols.   Sorry, use enums for now.
+
+
+*Lexical Elements 
+**Identifiers 
+Identifiers are case-sensitive. They may not start with numbers, but may
+include the characters a-z, A-Z, and 0-9, as well as +, -, *, /, !, >, <,
+_, =, and probably a few other things.
+
+**Comments 
+Line comments start with a semicolon (;). Block comments start with /- and end with -/. Block comments may be nested.
+
+**Literals 
+Integer literals are strings of numbers 0-9. "0x" followed by a string of
+0-9 and a-f or A-F (case insensitive) are hexadecimal integers. "0b"
+followed by a string of 0-1 are binary integers. "0o" followed by a string
+of 0-7 are octal numbers.  You can write integers of arbitrary base by the syntax #n#somenum where n is the base, and can be any number from 2 to 36.
+
+Floating point literals are just numbers 0-9, a decimal point, and some more
+numbers 0-9. You can also put an exponential term at the end, such as 3.5e3,
+or 94.364E-4. Case on the "e" doesn't matter.
+
+Array literals are a list of literals surrounded by {curly brackets}.
+All elements in an array literal must have the same type.  You cannot
+put expressions in array literals at this point.
+
+A single character enclosed in single quotes (') is a character literal. There
+are also several escape sequences for non-printable characters: '\t' is a tab,
+'\n' is a newline, '\r' is a carriage return, and '\b' is a backspace. '\X'
+where X is any integer literal (as above) specifies a character literal with
+that ASCII value. You know the drill.
+
+For now, characters are just 7-bit ASCII.  Unicode will come later.
+Note that characters are CHARACTERS, not numbers.  Their size is not
+guarenteed to be a byte, or anything else.
+
+Strings are delimited by double quotes ("). A string is just an array of
+characters. Character literals can be embedded in strings, just do the
+backslash escape sequence.
+
+
+**Reserved symbols
+
+Reserved names and symbols are: 
+if then elif else while do end fun in : , ( ) [ ] { } def defun " ' typecase
+struct type enum union <- var
+
+*Types and Type System
+KISS.  Basic atomic types: integers, floats, characters.  Pointers and enums
+and functions as well.  
+Then we have compound types: tagged unions, arrays and structs
+Atomic types cannot be decomposed into simpler elements, while compound types
+can.
+
+We do the Java-ish value vs. reference type.  Strings, structures, tagged unions
+and arrays are all reference types.
+XXX: Actually, should tagged unions be reference types?  They could be 
+references themselves, just sorta fat...  Hm.
+
+We also want parametric polymorphism.  Polymorphic types are just given by a
+name prefixed with a %.  You can do nothing with a polymorphic value except
+assign it, return it, or call another polymorphic function on it.  For
+instance:
+
+defun foo v1 %a, v2 %a (bool)
+   return (= v1 v2)
+end
+
+has type
+fun( %a, %a )( bool )
+Each %a must be the same.  If they were different types you'd have to give them different names, such as:
+
+defun bar v1 %a, v2 %b (someType)
+   return (doSomethingWith v1 v2)
+end
+
+This has type fun( %a, %b )( someType )
+
+
+Types can contain other types...  arrays are the most obvious example, for instance
+"array(int)" or even "array(%t)".
+
+Right now, for the sake of oh-gods simplicity...
+1) There is no way to convert types into each other, and
+2) Integers and floats are seperate types entirely.  + is not the same 
+function as +.
+This will proooooobably change later.
+
+
+**Type definitions
+New types can be defined with the syntax:
+type x: y
+which creates a new type "x" which is eqivilant to type "y".
+Polymorphism and such can be applied here.  So you can write
+type intArray: array(int)
+to create a version of the array type that only accepts integer values.
+If you wanted to create a new type of array that could accept either
+integer or float values, you'd have to use a tagged union.
+
+
+**Numbers 
+We've covered this pretty well.  Integers and floats.  Integers are at the 
+moment whatever size machine word is handy, and are always signed.  Floating 
+point numbers are IEEE.754 or whatever it is.  Keep it simple for now.
+
+**Arrays
+Arrays are a contiguous whack of memory.  They have a fixed length, they know
+their length, and do automatic bounds-checking (there may be a compiler switch 
+to tell them not to, maybe).
+They do parametric polymorphism too, as demonstrated above.
+
+Arrays elements are indexed by the syntax
+arr[i]
+and are assigned to by the syntax
+arr[i] <- val
+where both arr and i can be expressions.
+
+**Characters
+Characters, we've gone over.
+
+**Strings
+Strings are arrays of characters.  Nothing special apart from syntax.
+Strings can be referenced and assigned just like arrays can.
+
+**Structures
+Structures are a bunch of different types mooshed together. 
+This declares a new structure of type "foo" with three members: an integer x, a
+float y, and a reference to another foo structure "z".
+struct foo:
+   x int
+   y float
+   z foo
+end
+
+Structures can be polymorphic:
+
+struct list(%t):
+   item %t
+   next list(%t)
+end
+
+Structures, like arrays, are indexed in the familiar C-ish way.
+list.item
+list.next <- nextNode
+
+Structures can be given default values:
+struct bop
+   x int <- 0
+   y float <- 1.0
+end
+
+Structures can also be written as expressions:
+var foo bop <- bop{ x: 10, y: 20.0 }
+
+**Pointers
+Pointers are for low-level programming.  You can point them at arbitrary
+addresses.  You can do arithmatic and let them dangle and overrun arrays and
+fandango on core and all sorts of things.  Try to never use them unless you're
+writing something like an operating system or memory manager.
+
+type foo_p: pointer(foo)
+
+def someFoo foo: ...
+def p1 foo_p: (ref someFoo)
+def foo2 foo: (deref p1)
+p1 <- (+ p1 -79)
+foo2 <- (deref p1)  ; Kaboom!  You'd better pray this segfaults.
+
+
+**Tagged Unions
+Tagged unions consist of an integer and a reference smooshed against each other.
+Yeah, I dunno how to explain these right now.
+
+union foo:
+   Foo( int )
+   Bar( somestruct )
+   Bop( float )
+end
+
+var x foo: :Foo( 10 )
+typecase x:
+   case Foo: (doSomethingWithInt x)
+   case Bar: (doSomethingWithSomeStruct x)
+   case Bop: (doSomethingWithFloat x)
+end
+
+typecase x:
+   case Bop: (doSomethingWithFloat x)
+   else: ; You can insert arbitrary code here, but will get type errors if
+         ; you treat x as anything besides polymorphic
+end
+
+You can't deconstruct a union to get at its member without using a 
+typecase.  This preserves safety, even if it's a bit of a pain in the butt.
+
+**Enumerations
+Enumerations are basically named numbers.  However, unlike C, they're actually
+type-checked.  If something has an enumeration type you can't shove an integer
+into it, and vice versa.
+
+enum foo:
+   Foo  ; = 0
+   Foo2 ; = 1
+   Bar <- 30  ; = 30
+   Bop  ; = 31
+   Baz <- -3  ; = -3
+   Beep ; = -2
+   Quux <- 30  ; Compilation error; duplicates are invalid.
+end
+
+We may automagically get a couple functions now...  foo2int and int2foo.
+This lets enumerations have meaningful numerical values, like months and
+stuff.  For int2foo, they'll naturally check that the integer is actually in a 
+valid range.  It'd be sweet if we could wrangle that.
+The alternative is not having enumerations have numerical values at all...  
+But that sorta sucks.
+
+
+
+*Program Structure
+
+Everything is evaluated from left to right. All expressions are evaluated in
+the order they are written. Program execution probably starts at the function
+called "main" which recieves as its argument an array of strings as its 
+argument, and returns an integer as the program's return value, yadda yadda.
+
+A program is a bunch of statements, for now. We may add more declerations like 
+namespaces and such soon.
+
+*Statements
+
+There are only a few kinds of statements, all of which happen outside of
+functions: global variable defintions (for globals, constants, functions,
+etc), and type definitions (structures, etc).
+We will add module definitions somewhere.
+
+The most basic thing is global variable definitions, which are also used for function definitions with a bit of syntactic sugar
+
+def somename type: someexpression
+
+def somefunc function-of-whatever-type-signature: fun args (rettype) ... end
+
+defun funcname args (rettype) end
+
+**Type Definition
+type foo: bar
+struct foo: ... end
+union foo: ... end
+enum foo: ... end
+
+
+**Builtin types:
+int
+float
+char
+string
+array(%a)
+pointer(%a)
+fun(argtype, argtype, ...)(rettype)
+
+There will (someday) be more builtin types of various sizes; long, double, 
+byte, word, possibly a few more.  There will be types that explicitly state
+their size and signedness, such as 'int8', 'uint8', 'int16', 'uint16', etc.
+There will also be constants that tell you just how big 'int', 'float' and so
+on are on the given platform.
+
+We'll have basically the entire Scheme numerical tower as well, it'll just be
+a library.
+
+
+*Expressions
+
+We start with only a few types of expressions apart from literals and
+variables: function definitions, if statements, while statements, function
+calls, and variable bindings, and typecases.
+
+XXX: To do: Assignment!  Doh.
+XXX: Hmm.  Array references CAN be functions, but that's sorta nasty.
+Structure references are even worse.
+XXX: Explicit scope blocks?
+
+
+**Function Definitions
+
+SOMEDAY, functions will return multiple values, and have the potential to take
+arbitrary numbers of arguments.
+Right now, these are anonymous functions.  Non-anonymous functions are
+just global variables.
+
+So far, functions must ALWAYS return at least one value.  This may end up
+changing.  Zero is just another possible number of return values.
+
+fun x int, y float, z somethingelse (returntype, returntype, ...) ... end
+
+Functions can have their args referenced by name:
+
+defun foo x int, y int (int, int)
+   return y x
+end
+
+(foo 1 2) -> 2 1
+(foo x=1 y=2) -> 2 1
+(foo y=1 x=2) -> 2 1
+(foo y=1) -> compilation error
+
+
+Functions can have default values specified:
+defun bar x=10 int, y=20 int (int, int)
+   return y x
+end
+
+(bar) -> 20 10
+(bar 1) -> 20 1
+(bar y=1) -> 1 10
+
+Functions can also take varargs:
+
+defun notQuitePrintf x string, y array(string) ()
+   ...
+end
+
+(notQuitePrintf "%s %s and %s" "milk" "cookies" "chocolate")
+(notQuitePrintf "%s %s and %s" {"milk" "cookies" "chocolate"})
+(notQuitePrintf "%s %s and %s" "three" "4" 10) ; Type error, sadly
+
+
+
+
+
+**Function Calls
+
+(f x1 x2 ...)
+
+All math and logic and such is function calls for now.
+It'd be nice to inline them someday.
+
+**If and While
+
+if a then b [elif c]* [else z] end
+
+while a do b end
+
+**Variable Binding
+
+var x int: a
+var y float: b
+var z somethingelse: c
+var a int, b float, c string: (someComplicatedFunction)
+
+**Typecase
+typecase x:
+   case Foo: (doSomethingWithInt x)
+   case Bar: (doSomethingWithSomeStruct x)
+   case Bop: (doSomethingWithFloat x)
+end
+
+**Return
+return
+return <expr>
+return <expr> <expr> <expr>
+
+**Assignment
+a <- b
+a b c <- d e f
+
+*Modules
+
+Right now, we have no module system.
+
+The choices here abound.  Modules can be flat or heirarchical, covert or overt (hides or exposes things by default), simple or complex...
+
+I somewhat like the C# system of namespaces, actually.  Heirarchical namespaces that are not explicitly connected to any single file or such, but magically mesh together during loading.
+
+
+*Exceptions
+Oy.
+
+
+*Library
+We need ratios and bignums.  Basically, the whole Scheme numerical tower.
+Check out Cocoa.
+
+
+*Low Level Junk
+
+**Function Call Stuff 
+The function caller pushes stuff on the stack, and is responsible for popping
+it afterwards. The function called leaves the results on top of the stack
+though, so the caller should probably move them somewhere safe before popping
+everything.
+
+**Name Mangling
